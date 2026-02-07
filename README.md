@@ -42,3 +42,6 @@ Thanks to the upstream maintainers and contributors of `QuantumNous/new-api`.
 
 ## 统一源码目录
 - 源码入口：[`src/`](./src)
+
+## 目录结构
+- 结构说明：[`docs/PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md)
