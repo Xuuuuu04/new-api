@@ -35,3 +35,10 @@ This repository follows the license declared in `LICENSE`.
 
 ## Credits
 Thanks to the upstream maintainers and contributors of `QuantumNous/new-api`.
+
+## Language
+- 中文：[`README.md`](./README.md)
+- English：[`README_EN.md`](./README_EN.md)
+
+## 统一源码目录
+- 源码入口：[`src/`](./src)
