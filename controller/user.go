@@ -2,13 +2,11 @@ package controller
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -16,9 +14,6 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/setting"
-
-	"github.com/QuantumNous/new-api/constant"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -55,28 +50,6 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": err.Error(),
 			"success": false,
-		})
-		return
-	}
-
-	// 检查是否启用2FA
-	if model.IsTwoFAEnabled(user.Id) {
-		// 设置pending session，等待2FA验证
-		session := sessions.Default(c)
-		session.Set("pending_username", user.Username)
-		session.Set("pending_user_id", user.Id)
-		err := session.Save()
-		if err != nil {
-			common.ApiErrorI18n(c, i18n.MsgUserSessionSaveFailed)
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"message": i18n.T(c, i18n.MsgUserRequire2FA),
-			"success": true,
-			"data": map[string]interface{}{
-				"require_2fa": true,
-			},
 		})
 		return
 	}
@@ -126,104 +99,6 @@ func Logout(c *gin.Context) {
 		"message": "",
 		"success": true,
 	})
-}
-
-func Register(c *gin.Context) {
-	if !common.RegisterEnabled {
-		common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
-		return
-	}
-	if !common.PasswordRegisterEnabled {
-		common.ApiErrorI18n(c, i18n.MsgUserPasswordRegisterDisabled)
-		return
-	}
-	var user model.User
-	err := json.NewDecoder(c.Request.Body).Decode(&user)
-	if err != nil {
-		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
-		return
-	}
-	if err := common.Validate.Struct(&user); err != nil {
-		common.ApiErrorI18n(c, i18n.MsgUserInputInvalid, map[string]any{"Error": err.Error()})
-		return
-	}
-	if common.EmailVerificationEnabled {
-		if user.Email == "" || user.VerificationCode == "" {
-			common.ApiErrorI18n(c, i18n.MsgUserEmailVerificationRequired)
-			return
-		}
-		if !common.VerifyCodeWithKey(user.Email, user.VerificationCode, common.EmailVerificationPurpose) {
-			common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
-			return
-		}
-	}
-	exist, err := model.CheckUserExistOrDeleted(user.Username, user.Email)
-	if err != nil {
-		common.ApiErrorI18n(c, i18n.MsgDatabaseError)
-		common.SysLog(fmt.Sprintf("CheckUserExistOrDeleted error: %v", err))
-		return
-	}
-	if exist {
-		common.ApiErrorI18n(c, i18n.MsgUserExists)
-		return
-	}
-	affCode := user.AffCode // this code is the inviter's code, not the user's own code
-	inviterId, _ := model.GetUserIdByAffCode(affCode)
-	cleanUser := model.User{
-		Username:    user.Username,
-		Password:    user.Password,
-		DisplayName: user.Username,
-		InviterId:   inviterId,
-		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
-	}
-	if common.EmailVerificationEnabled {
-		cleanUser.Email = user.Email
-	}
-	if err := cleanUser.Insert(inviterId); err != nil {
-		common.ApiError(c, err)
-		return
-	}
-
-	// 获取插入后的用户ID
-	var insertedUser model.User
-	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
-		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
-		return
-	}
-	// 生成默认令牌
-	if constant.GenerateDefaultToken {
-		key, err := common.GenerateKey()
-		if err != nil {
-			common.ApiErrorI18n(c, i18n.MsgUserDefaultTokenFailed)
-			common.SysLog("failed to generate token key: " + err.Error())
-			return
-		}
-		// 生成默认令牌
-		token := model.Token{
-			UserId:             insertedUser.Id, // 使用插入后的用户ID
-			Name:               cleanUser.Username + "的初始令牌",
-			Key:                key,
-			CreatedTime:        common.GetTimestamp(),
-			AccessedTime:       common.GetTimestamp(),
-			ExpiredTime:        -1,     // 永不过期
-			RemainQuota:        500000, // 示例额度
-			UnlimitedQuota:     true,
-			ModelLimitsEnabled: false,
-		}
-		if setting.DefaultUseAutoGroup {
-			token.Group = "auto"
-		}
-		if err := token.Insert(); err != nil {
-			common.ApiErrorI18n(c, i18n.MsgCreateDefaultTokenErr)
-			return
-		}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-	})
-	return
 }
 
 func GetAllUsers(c *gin.Context) {
@@ -316,55 +191,6 @@ func GenerateAccessToken(c *gin.Context) {
 	return
 }
 
-type TransferAffQuotaRequest struct {
-	Quota int `json:"quota" binding:"required"`
-}
-
-func TransferAffQuota(c *gin.Context) {
-	id := c.GetInt("id")
-	user, err := model.GetUserById(id, true)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	tran := TransferAffQuotaRequest{}
-	if err := c.ShouldBindJSON(&tran); err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	err = user.TransferAffQuotaToQuota(tran.Quota)
-	if err != nil {
-		common.ApiErrorI18n(c, i18n.MsgUserTransferFailed, map[string]any{"Error": err.Error()})
-		return
-	}
-	common.ApiSuccessI18n(c, i18n.MsgUserTransferSuccess, nil)
-}
-
-func GetAffCode(c *gin.Context) {
-	id := c.GetInt("id")
-	user, err := model.GetUserById(id, true)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	if user.AffCode == "" {
-		user.AffCode = common.GetRandomString(4)
-		if err := user.Update(false); err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": err.Error(),
-			})
-			return
-		}
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    user.AffCode,
-	})
-	return
-}
-
 func GetSelf(c *gin.Context) {
 	id := c.GetInt("id")
 	userRole := c.GetInt("role")
@@ -390,23 +216,11 @@ func GetSelf(c *gin.Context) {
 		"role":              user.Role,
 		"status":            user.Status,
 		"email":             user.Email,
-		"github_id":         user.GitHubId,
-		"discord_id":        user.DiscordId,
-		"oidc_id":           user.OidcId,
-		"wechat_id":         user.WeChatId,
-		"telegram_id":       user.TelegramId,
 		"group":             user.Group,
 		"quota":             user.Quota,
 		"used_quota":        user.UsedQuota,
 		"request_count":     user.RequestCount,
-		"aff_code":          user.AffCode,
-		"aff_count":         user.AffCount,
-		"aff_quota":         user.AffQuota,
-		"aff_history_quota": user.AffHistoryQuota,
-		"inviter_id":        user.InviterId,
-		"linux_do_id":       user.LinuxDOId,
 		"setting":           user.Setting,
-		"stripe_customer":   user.StripeCustomer,
 		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
 		"permissions":       permissions,                // 新增权限字段
 	}
@@ -445,68 +259,6 @@ func calculateUserPermissions(userRole int) map[string]interface{} {
 	}
 
 	return permissions
-}
-
-// 根据用户角色生成默认的边栏配置
-func generateDefaultSidebarConfig(userRole int) string {
-	defaultConfig := map[string]interface{}{}
-
-	// 聊天区域 - 所有用户都可以访问
-	defaultConfig["chat"] = map[string]interface{}{
-		"enabled":    true,
-		"playground": true,
-		"chat":       true,
-	}
-
-	// 控制台区域 - 所有用户都可以访问
-	defaultConfig["console"] = map[string]interface{}{
-		"enabled":    true,
-		"detail":     true,
-		"token":      true,
-		"log":        true,
-		"midjourney": true,
-		"task":       true,
-	}
-
-	// 个人中心区域 - 所有用户都可以访问
-	defaultConfig["personal"] = map[string]interface{}{
-		"enabled":  true,
-		"topup":    true,
-		"personal": true,
-	}
-
-	// 管理员区域 - 根据角色决定
-	if userRole == common.RoleAdminUser {
-		// 管理员可以访问管理员区域，但不能访问系统设置
-		defaultConfig["admin"] = map[string]interface{}{
-			"enabled":    true,
-			"channel":    true,
-			"models":     true,
-			"redemption": true,
-			"user":       true,
-			"setting":    false, // 管理员不能访问系统设置
-		}
-	} else if userRole == common.RoleRootUser {
-		// 超级管理员可以访问所有功能
-		defaultConfig["admin"] = map[string]interface{}{
-			"enabled":    true,
-			"channel":    true,
-			"models":     true,
-			"redemption": true,
-			"user":       true,
-			"setting":    true,
-		}
-	}
-	// 普通用户不包含admin区域
-
-	// 转换为JSON字符串
-	configBytes, err := json.Marshal(defaultConfig)
-	if err != nil {
-		common.SysLog("生成默认边栏配置失败: " + err.Error())
-		return ""
-	}
-
-	return string(configBytes)
 }
 
 func GetUserModels(c *gin.Context) {
@@ -788,7 +540,7 @@ func CreateUser(c *gin.Context) {
 		DisplayName: user.DisplayName,
 		Role:        user.Role, // 保持管理员设置的角色
 	}
-	if err := cleanUser.Insert(0); err != nil {
+	if err := cleanUser.Insert(); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -916,81 +668,6 @@ func EmailBind(c *gin.Context) {
 		"message": "",
 	})
 	return
-}
-
-type topUpRequest struct {
-	Key string `json:"key"`
-}
-
-var topUpLocks sync.Map
-var topUpCreateLock sync.Mutex
-
-type topUpTryLock struct {
-	ch chan struct{}
-}
-
-func newTopUpTryLock() *topUpTryLock {
-	return &topUpTryLock{ch: make(chan struct{}, 1)}
-}
-
-func (l *topUpTryLock) TryLock() bool {
-	select {
-	case l.ch <- struct{}{}:
-		return true
-	default:
-		return false
-	}
-}
-
-func (l *topUpTryLock) Unlock() {
-	select {
-	case <-l.ch:
-	default:
-	}
-}
-
-func getTopUpLock(userID int) *topUpTryLock {
-	if v, ok := topUpLocks.Load(userID); ok {
-		return v.(*topUpTryLock)
-	}
-	topUpCreateLock.Lock()
-	defer topUpCreateLock.Unlock()
-	if v, ok := topUpLocks.Load(userID); ok {
-		return v.(*topUpTryLock)
-	}
-	l := newTopUpTryLock()
-	topUpLocks.Store(userID, l)
-	return l
-}
-
-func TopUp(c *gin.Context) {
-	id := c.GetInt("id")
-	lock := getTopUpLock(id)
-	if !lock.TryLock() {
-		common.ApiErrorI18n(c, i18n.MsgUserTopUpProcessing)
-		return
-	}
-	defer lock.Unlock()
-	req := topUpRequest{}
-	err := c.ShouldBindJSON(&req)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	quota, err := model.Redeem(req.Key, id)
-	if err != nil {
-		if errors.Is(err, model.ErrRedeemFailed) {
-			common.ApiErrorI18n(c, i18n.MsgRedeemFailed)
-			return
-		}
-		common.ApiError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    quota,
-	})
 }
 
 type UpdateUserSettingRequest struct {

@@ -26,27 +26,15 @@ type User struct {
 	Role             int            `json:"role" gorm:"type:int;default:1"`   // admin, common
 	Status           int            `json:"status" gorm:"type:int;default:1"` // enabled, disabled
 	Email            string         `json:"email" gorm:"index" validate:"max=50"`
-	GitHubId         string         `json:"github_id" gorm:"column:github_id;index"`
-	DiscordId        string         `json:"discord_id" gorm:"column:discord_id;index"`
-	OidcId           string         `json:"oidc_id" gorm:"column:oidc_id;index"`
-	WeChatId         string         `json:"wechat_id" gorm:"column:wechat_id;index"`
-	TelegramId       string         `json:"telegram_id" gorm:"column:telegram_id;index"`
 	VerificationCode string         `json:"verification_code" gorm:"-:all"`                                    // this field is only for Email verification, don't save it to database!
 	AccessToken      *string        `json:"access_token" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
 	Quota            int            `json:"quota" gorm:"type:int;default:0"`
 	UsedQuota        int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
 	RequestCount     int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
 	Group            string         `json:"group" gorm:"type:varchar(64);default:'default'"`
-	AffCode          string         `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
-	AffCount         int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
-	AffQuota         int            `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
-	AffHistoryQuota  int            `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
-	InviterId        int            `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
-	LinuxDOId        string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
 	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
-	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -110,15 +98,6 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 		"detail":     true,
 		"token":      true,
 		"log":        true,
-		"midjourney": true,
-		"task":       true,
-	}
-
-	// 个人中心区域 - 所有用户都可以访问
-	defaultConfig["personal"] = map[string]interface{}{
-		"enabled":  true,
-		"topup":    true,
-		"personal": true,
 	}
 
 	// 管理员区域 - 根据角色决定
@@ -128,7 +107,6 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 			"enabled":    true,
 			"channel":    true,
 			"models":     true,
-			"redemption": true,
 			"user":       true,
 			"setting":    false, // 管理员不能访问系统设置
 		}
@@ -138,7 +116,6 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 			"enabled":    true,
 			"channel":    true,
 			"models":     true,
-			"redemption": true,
 			"user":       true,
 			"setting":    true,
 		}
@@ -300,15 +277,6 @@ func GetUserById(id int, selectAll bool) (*User, error) {
 	return &user, err
 }
 
-func GetUserIdByAffCode(affCode string) (int, error) {
-	if affCode == "" {
-		return 0, errors.New("affCode 为空！")
-	}
-	var user User
-	err := DB.Select("id").First(&user, "aff_code = ?", affCode).Error
-	return user.Id, err
-}
-
 func DeleteUserById(id int) (err error) {
 	if id == 0 {
 		return errors.New("id 为空！")
@@ -325,55 +293,7 @@ func HardDeleteUserById(id int) error {
 	return err
 }
 
-func inviteUser(inviterId int) (err error) {
-	user, err := GetUserById(inviterId, true)
-	if err != nil {
-		return err
-	}
-	user.AffCount++
-	user.AffQuota += common.QuotaForInviter
-	user.AffHistoryQuota += common.QuotaForInviter
-	return DB.Save(user).Error
-}
-
-func (user *User) TransferAffQuotaToQuota(quota int) error {
-	// 检查quota是否小于最小额度
-	if float64(quota) < common.QuotaPerUnit {
-		return fmt.Errorf("转移额度最小为%s！", logger.LogQuota(int(common.QuotaPerUnit)))
-	}
-
-	// 开始数据库事务
-	tx := DB.Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
-	defer tx.Rollback() // 确保在函数退出时事务能回滚
-
-	// 加锁查询用户以确保数据一致性
-	err := tx.Set("gorm:query_option", "FOR UPDATE").First(&user, user.Id).Error
-	if err != nil {
-		return err
-	}
-
-	// 再次检查用户的AffQuota是否足够
-	if user.AffQuota < quota {
-		return errors.New("邀请额度不足！")
-	}
-
-	// 更新用户额度
-	user.AffQuota -= quota
-	user.Quota += quota
-
-	// 保存用户状态
-	if err := tx.Save(user).Error; err != nil {
-		return err
-	}
-
-	// 提交事务
-	return tx.Commit().Error
-}
-
-func (user *User) Insert(inviterId int) error {
+func (user *User) Insert() error {
 	var err error
 	if user.Password != "" {
 		user.Password, err = common.Password2Hash(user.Password)
@@ -383,7 +303,6 @@ func (user *User) Insert(inviterId int) error {
 	}
 	user.Quota = common.QuotaForNewUser
 	//user.SetAccessToken(common.GetUUID())
-	user.AffCode = common.GetRandomString(4)
 
 	// 初始化用户设置，包括默认的边栏配置
 	if user.Setting == "" {
@@ -414,17 +333,6 @@ func (user *User) Insert(inviterId int) error {
 
 	if common.QuotaForNewUser > 0 {
 		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", logger.LogQuota(common.QuotaForNewUser)))
-	}
-	if inviterId != 0 {
-		if common.QuotaForInvitee > 0 {
-			_ = IncreaseUserQuota(user.Id, common.QuotaForInvitee, true)
-			RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("使用邀请码赠送 %s", logger.LogQuota(common.QuotaForInvitee)))
-		}
-		if common.QuotaForInviter > 0 {
-			//_ = IncreaseUserQuota(inviterId, common.QuotaForInviter)
-			RecordLog(inviterId, LogTypeSystem, fmt.Sprintf("邀请用户赠送 %s", logger.LogQuota(common.QuotaForInviter)))
-			_ = inviteUser(inviterId)
-		}
 	}
 	return nil
 }
@@ -532,79 +440,8 @@ func (user *User) FillUserByEmail() error {
 	return nil
 }
 
-func (user *User) FillUserByGitHubId() error {
-	if user.GitHubId == "" {
-		return errors.New("GitHub id 为空！")
-	}
-	DB.Where(User{GitHubId: user.GitHubId}).First(user)
-	return nil
-}
-
-// UpdateGitHubId updates the user's GitHub ID (used for migration from login to numeric ID)
-func (user *User) UpdateGitHubId(newGitHubId string) error {
-	if user.Id == 0 {
-		return errors.New("user id is empty")
-	}
-	return DB.Model(user).Update("github_id", newGitHubId).Error
-}
-
-func (user *User) FillUserByDiscordId() error {
-	if user.DiscordId == "" {
-		return errors.New("discord id 为空！")
-	}
-	DB.Where(User{DiscordId: user.DiscordId}).First(user)
-	return nil
-}
-
-func (user *User) FillUserByOidcId() error {
-	if user.OidcId == "" {
-		return errors.New("oidc id 为空！")
-	}
-	DB.Where(User{OidcId: user.OidcId}).First(user)
-	return nil
-}
-
-func (user *User) FillUserByWeChatId() error {
-	if user.WeChatId == "" {
-		return errors.New("WeChat id 为空！")
-	}
-	DB.Where(User{WeChatId: user.WeChatId}).First(user)
-	return nil
-}
-
-func (user *User) FillUserByTelegramId() error {
-	if user.TelegramId == "" {
-		return errors.New("Telegram id 为空！")
-	}
-	err := DB.Where(User{TelegramId: user.TelegramId}).First(user).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return errors.New("该 Telegram 账户未绑定")
-	}
-	return nil
-}
-
 func IsEmailAlreadyTaken(email string) bool {
 	return DB.Unscoped().Where("email = ?", email).Find(&User{}).RowsAffected == 1
-}
-
-func IsWeChatIdAlreadyTaken(wechatId string) bool {
-	return DB.Unscoped().Where("wechat_id = ?", wechatId).Find(&User{}).RowsAffected == 1
-}
-
-func IsGitHubIdAlreadyTaken(githubId string) bool {
-	return DB.Unscoped().Where("github_id = ?", githubId).Find(&User{}).RowsAffected == 1
-}
-
-func IsDiscordIdAlreadyTaken(discordId string) bool {
-	return DB.Unscoped().Where("discord_id = ?", discordId).Find(&User{}).RowsAffected == 1
-}
-
-func IsOidcIdAlreadyTaken(oidcId string) bool {
-	return DB.Where("oidc_id = ?", oidcId).Find(&User{}).RowsAffected == 1
-}
-
-func IsTelegramIdAlreadyTaken(telegramId string) bool {
-	return DB.Unscoped().Where("telegram_id = ?", telegramId).Find(&User{}).RowsAffected == 1
 }
 
 func ResetUserPasswordByEmail(email string, password string) error {
@@ -913,20 +750,6 @@ func GetUsernameById(id int, fromDB bool) (username string, err error) {
 	}
 
 	return username, nil
-}
-
-func IsLinuxDOIdAlreadyTaken(linuxDOId string) bool {
-	var user User
-	err := DB.Unscoped().Where("linux_do_id = ?", linuxDOId).First(&user).Error
-	return !errors.Is(err, gorm.ErrRecordNotFound)
-}
-
-func (user *User) FillUserByLinuxDOId() error {
-	if user.LinuxDOId == "" {
-		return errors.New("linux do id is empty")
-	}
-	err := DB.Where("linux_do_id = ?", user.LinuxDOId).First(user).Error
-	return err
 }
 
 func RootUserExists() bool {

@@ -26,6 +26,7 @@ type Model struct {
 	Description  string         `json:"description,omitempty" gorm:"type:text"`
 	Icon         string         `json:"icon,omitempty" gorm:"type:varchar(128)"`
 	Tags         string         `json:"tags,omitempty" gorm:"type:varchar(255)"`
+	PricePer1M   float64        `json:"price_per_1m" gorm:"type:decimal(10,6);not null;default:0"`
 	VendorID     int            `json:"vendor_id,omitempty" gorm:"index"`
 	Endpoints    string         `json:"endpoints,omitempty" gorm:"type:text"`
 	Status       int            `json:"status" gorm:"default:1"`

@@ -30,6 +30,14 @@ type Token struct {
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
+type TokenSummary struct {
+	Id     int
+	Name   string
+	Group  string
+	Status int
+	UserId int
+}
+
 func (token *Token) Clean() {
 	token.Key = ""
 }
@@ -60,6 +68,15 @@ func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
 	var tokens []*Token
 	var err error
 	err = DB.Where("user_id = ?", userId).Order("id desc").Limit(num).Offset(startIdx).Find(&tokens).Error
+	return tokens, err
+}
+
+func ListTokensForAdmin() ([]TokenSummary, error) {
+	var tokens []TokenSummary
+	err := DB.Model(&Token{}).
+		Select("id, name, `group`, status, user_id").
+		Order("id desc").
+		Find(&tokens).Error
 	return tokens, err
 }
 

@@ -88,6 +88,10 @@ func CreateModelMeta(c *gin.Context) {
 		common.ApiErrorMsg(c, "模型名称不能为空")
 		return
 	}
+	if m.PricePer1M < 0 {
+		common.ApiErrorMsg(c, "价格不能为负数")
+		return
+	}
 	// 名称冲突检查
 	if dup, err := model.IsModelNameDuplicated(0, m.ModelName); err != nil {
 		common.ApiError(c, err)
@@ -135,6 +139,10 @@ func UpdateModelMeta(c *gin.Context) {
 			return
 		}
 
+		if m.PricePer1M < 0 {
+			common.ApiErrorMsg(c, "价格不能为负数")
+			return
+		}
 		if err := m.Update(); err != nil {
 			common.ApiError(c, err)
 			return

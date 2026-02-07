@@ -17,7 +17,6 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
-	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -79,14 +78,6 @@ func init() {
 			OwnedBy: minimax.ChannelName,
 		})
 	}
-	for modelName, _ := range constant.MidjourneyModel2Action {
-		openAIModels = append(openAIModels, dto.OpenAIModels{
-			Id:      modelName,
-			Object:  "model",
-			Created: 1626777600,
-			OwnedBy: "midjourney",
-		})
-	}
 	openAIModelsMap = make(map[string]dto.OpenAIModels)
 	for _, aiModel := range openAIModels {
 		openAIModelsMap[aiModel.Id] = aiModel
@@ -134,8 +125,7 @@ func ListModels(c *gin.Context, modelType int) {
 		}
 		for allowModel, _ := range tokenModelLimit {
 			if !acceptUnsetRatioModel {
-				_, _, exist := ratio_setting.GetModelRatioOrPrice(allowModel)
-				if !exist {
+				if _, exist := model.GetModelPricePer1M(allowModel); !exist {
 					continue
 				}
 			}
@@ -182,8 +172,7 @@ func ListModels(c *gin.Context, modelType int) {
 		}
 		for _, modelName := range models {
 			if !acceptUnsetRatioModel {
-				_, _, exist := ratio_setting.GetModelRatioOrPrice(modelName)
-				if !exist {
+				if _, exist := model.GetModelPricePer1M(modelName); !exist {
 					continue
 				}
 			}

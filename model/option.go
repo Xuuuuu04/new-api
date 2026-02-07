@@ -19,6 +19,86 @@ type Option struct {
 	Value string `json:"value"`
 }
 
+var disabledOptionKeys = map[string]struct{}{
+	"PasswordRegisterEnabled": {},
+	"EmailVerificationEnabled": {},
+	"GitHubOAuthEnabled": {},
+	"LinuxDOOAuthEnabled": {},
+	"TelegramOAuthEnabled": {},
+	"WeChatAuthEnabled": {},
+	"GitHubClientId": {},
+	"GitHubClientSecret": {},
+	"LinuxDOClientId": {},
+	"LinuxDOClientSecret": {},
+	"LinuxDOMinimumTrustLevel": {},
+	"TelegramBotToken": {},
+	"TelegramBotName": {},
+	"WeChatServerAddress": {},
+	"WeChatServerToken": {},
+	"WeChatAccountQRCodeImageURL": {},
+	"discord.enabled": {},
+	"discord.client_id": {},
+	"discord.client_secret": {},
+	"oidc.enabled": {},
+	"oidc.client_id": {},
+	"oidc.client_secret": {},
+	"oidc.well_known": {},
+	"oidc.authorization_endpoint": {},
+	"oidc.token_endpoint": {},
+	"oidc.user_info_endpoint": {},
+	"passkey.enabled": {},
+	"passkey.rp_display_name": {},
+	"passkey.rp_id": {},
+	"passkey.origins": {},
+	"passkey.allow_insecure_origin": {},
+	"passkey.user_verification": {},
+	"passkey.attachment_preference": {},
+	"TurnstileCheckEnabled": {},
+	"RegisterEnabled": {},
+	"PayAddress": {},
+	"CustomCallbackAddress": {},
+	"EpayId": {},
+	"EpayKey": {},
+	"Price": {},
+	"USDExchangeRate": {},
+	"MinTopUp": {},
+	"StripeMinTopUp": {},
+	"StripeApiSecret": {},
+	"StripeWebhookSecret": {},
+	"StripePriceId": {},
+	"StripeUnitPrice": {},
+	"StripePromotionCodesEnabled": {},
+	"CreemApiKey": {},
+	"CreemProducts": {},
+	"CreemTestMode": {},
+	"CreemWebhookSecret": {},
+	"DrawingEnabled": {},
+	"TaskEnabled": {},
+	"MjNotifyEnabled": {},
+	"MjAccountFilterEnabled": {},
+	"MjModeClearEnabled": {},
+	"MjForwardUrlEnabled": {},
+	"MjActionCheckSuccessEnabled": {},
+	"TopupGroupRatio": {},
+	"PayMethods": {},
+	"TopUpLink": {},
+	"QuotaForNewUser": {},
+	"QuotaForInviter": {},
+	"QuotaForInvitee": {},
+	"ModelRatio": {},
+	"ModelPrice": {},
+	"CacheRatio": {},
+	"CompletionRatio": {},
+	"ImageRatio": {},
+	"AudioRatio": {},
+	"AudioCompletionRatio": {},
+}
+
+func isOptionDisabled(key string) bool {
+	_, ok := disabledOptionKeys[key]
+	return ok
+}
+
 func AllOption() ([]*Option, error) {
 	var options []*Option
 	var err error
@@ -36,21 +116,11 @@ func InitOptionMap() {
 	common.OptionMap["ImageUploadPermission"] = strconv.Itoa(common.ImageUploadPermission)
 	common.OptionMap["ImageDownloadPermission"] = strconv.Itoa(common.ImageDownloadPermission)
 	common.OptionMap["PasswordLoginEnabled"] = strconv.FormatBool(common.PasswordLoginEnabled)
-	common.OptionMap["PasswordRegisterEnabled"] = strconv.FormatBool(common.PasswordRegisterEnabled)
-	common.OptionMap["EmailVerificationEnabled"] = strconv.FormatBool(common.EmailVerificationEnabled)
-	common.OptionMap["GitHubOAuthEnabled"] = strconv.FormatBool(common.GitHubOAuthEnabled)
-	common.OptionMap["LinuxDOOAuthEnabled"] = strconv.FormatBool(common.LinuxDOOAuthEnabled)
-	common.OptionMap["TelegramOAuthEnabled"] = strconv.FormatBool(common.TelegramOAuthEnabled)
-	common.OptionMap["WeChatAuthEnabled"] = strconv.FormatBool(common.WeChatAuthEnabled)
-	common.OptionMap["TurnstileCheckEnabled"] = strconv.FormatBool(common.TurnstileCheckEnabled)
-	common.OptionMap["RegisterEnabled"] = strconv.FormatBool(common.RegisterEnabled)
 	common.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
 	common.OptionMap["AutomaticEnableChannelEnabled"] = strconv.FormatBool(common.AutomaticEnableChannelEnabled)
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
-	common.OptionMap["DrawingEnabled"] = strconv.FormatBool(common.DrawingEnabled)
-	common.OptionMap["TaskEnabled"] = strconv.FormatBool(common.TaskEnabled)
 	common.OptionMap["DataExportEnabled"] = strconv.FormatBool(common.DataExportEnabled)
 	common.OptionMap["ChannelDisableThreshold"] = strconv.FormatFloat(common.ChannelDisableThreshold, 'f', -1, 64)
 	common.OptionMap["EmailDomainRestrictionEnabled"] = strconv.FormatBool(common.EmailDomainRestrictionEnabled)
@@ -72,57 +142,20 @@ func InitOptionMap() {
 	common.OptionMap["WorkerUrl"] = system_setting.WorkerUrl
 	common.OptionMap["WorkerValidKey"] = system_setting.WorkerValidKey
 	common.OptionMap["WorkerAllowHttpImageRequestEnabled"] = strconv.FormatBool(system_setting.WorkerAllowHttpImageRequestEnabled)
-	common.OptionMap["PayAddress"] = ""
-	common.OptionMap["CustomCallbackAddress"] = ""
-	common.OptionMap["EpayId"] = ""
-	common.OptionMap["EpayKey"] = ""
-	common.OptionMap["Price"] = strconv.FormatFloat(operation_setting.Price, 'f', -1, 64)
-	common.OptionMap["USDExchangeRate"] = strconv.FormatFloat(operation_setting.USDExchangeRate, 'f', -1, 64)
-	common.OptionMap["MinTopUp"] = strconv.Itoa(operation_setting.MinTopUp)
-	common.OptionMap["StripeMinTopUp"] = strconv.Itoa(setting.StripeMinTopUp)
-	common.OptionMap["StripeApiSecret"] = setting.StripeApiSecret
-	common.OptionMap["StripeWebhookSecret"] = setting.StripeWebhookSecret
-	common.OptionMap["StripePriceId"] = setting.StripePriceId
-	common.OptionMap["StripeUnitPrice"] = strconv.FormatFloat(setting.StripeUnitPrice, 'f', -1, 64)
-	common.OptionMap["StripePromotionCodesEnabled"] = strconv.FormatBool(setting.StripePromotionCodesEnabled)
-	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
-	common.OptionMap["CreemProducts"] = setting.CreemProducts
-	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
-	common.OptionMap["CreemWebhookSecret"] = setting.CreemWebhookSecret
-	common.OptionMap["TopupGroupRatio"] = common.TopupGroupRatio2JSONString()
 	common.OptionMap["Chats"] = setting.Chats2JsonString()
 	common.OptionMap["AutoGroups"] = setting.AutoGroups2JsonString()
 	common.OptionMap["DefaultUseAutoGroup"] = strconv.FormatBool(setting.DefaultUseAutoGroup)
-	common.OptionMap["PayMethods"] = operation_setting.PayMethods2JsonString()
-	common.OptionMap["GitHubClientId"] = ""
-	common.OptionMap["GitHubClientSecret"] = ""
-	common.OptionMap["TelegramBotToken"] = ""
-	common.OptionMap["TelegramBotName"] = ""
-	common.OptionMap["WeChatServerAddress"] = ""
-	common.OptionMap["WeChatServerToken"] = ""
-	common.OptionMap["WeChatAccountQRCodeImageURL"] = ""
 	common.OptionMap["TurnstileSiteKey"] = ""
 	common.OptionMap["TurnstileSecretKey"] = ""
-	common.OptionMap["QuotaForNewUser"] = strconv.Itoa(common.QuotaForNewUser)
-	common.OptionMap["QuotaForInviter"] = strconv.Itoa(common.QuotaForInviter)
-	common.OptionMap["QuotaForInvitee"] = strconv.Itoa(common.QuotaForInvitee)
 	common.OptionMap["QuotaRemindThreshold"] = strconv.Itoa(common.QuotaRemindThreshold)
 	common.OptionMap["PreConsumedQuota"] = strconv.Itoa(common.PreConsumedQuota)
 	common.OptionMap["ModelRequestRateLimitCount"] = strconv.Itoa(setting.ModelRequestRateLimitCount)
 	common.OptionMap["ModelRequestRateLimitDurationMinutes"] = strconv.Itoa(setting.ModelRequestRateLimitDurationMinutes)
 	common.OptionMap["ModelRequestRateLimitSuccessCount"] = strconv.Itoa(setting.ModelRequestRateLimitSuccessCount)
 	common.OptionMap["ModelRequestRateLimitGroup"] = setting.ModelRequestRateLimitGroup2JSONString()
-	common.OptionMap["ModelRatio"] = ratio_setting.ModelRatio2JSONString()
-	common.OptionMap["ModelPrice"] = ratio_setting.ModelPrice2JSONString()
-	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
 	common.OptionMap["GroupRatio"] = ratio_setting.GroupRatio2JSONString()
 	common.OptionMap["GroupGroupRatio"] = ratio_setting.GroupGroupRatio2JSONString()
 	common.OptionMap["UserUsableGroups"] = setting.UserUsableGroups2JSONString()
-	common.OptionMap["CompletionRatio"] = ratio_setting.CompletionRatio2JSONString()
-	common.OptionMap["ImageRatio"] = ratio_setting.ImageRatio2JSONString()
-	common.OptionMap["AudioRatio"] = ratio_setting.AudioRatio2JSONString()
-	common.OptionMap["AudioCompletionRatio"] = ratio_setting.AudioCompletionRatio2JSONString()
-	common.OptionMap["TopUpLink"] = common.TopUpLink
 	//common.OptionMap["ChatLink"] = common.ChatLink
 	//common.OptionMap["ChatLink2"] = common.ChatLink2
 	common.OptionMap["QuotaPerUnit"] = strconv.FormatFloat(common.QuotaPerUnit, 'f', -1, 64)
@@ -130,11 +163,6 @@ func InitOptionMap() {
 	common.OptionMap["DataExportInterval"] = strconv.Itoa(common.DataExportInterval)
 	common.OptionMap["DataExportDefaultTime"] = common.DataExportDefaultTime
 	common.OptionMap["DefaultCollapseSidebar"] = strconv.FormatBool(common.DefaultCollapseSidebar)
-	common.OptionMap["MjNotifyEnabled"] = strconv.FormatBool(setting.MjNotifyEnabled)
-	common.OptionMap["MjAccountFilterEnabled"] = strconv.FormatBool(setting.MjAccountFilterEnabled)
-	common.OptionMap["MjModeClearEnabled"] = strconv.FormatBool(setting.MjModeClearEnabled)
-	common.OptionMap["MjForwardUrlEnabled"] = strconv.FormatBool(setting.MjForwardUrlEnabled)
-	common.OptionMap["MjActionCheckSuccessEnabled"] = strconv.FormatBool(setting.MjActionCheckSuccessEnabled)
 	common.OptionMap["CheckSensitiveEnabled"] = strconv.FormatBool(setting.CheckSensitiveEnabled)
 	common.OptionMap["DemoSiteEnabled"] = strconv.FormatBool(operation_setting.DemoSiteEnabled)
 	common.OptionMap["SelfUseModeEnabled"] = strconv.FormatBool(operation_setting.SelfUseModeEnabled)
@@ -193,6 +221,12 @@ func UpdateOption(key string, value string) error {
 }
 
 func updateOptionMap(key string, value string) (err error) {
+	if isOptionDisabled(key) {
+		common.OptionMapRWMutex.Lock()
+		delete(common.OptionMap, key)
+		common.OptionMapRWMutex.Unlock()
+		return nil
+	}
 	common.OptionMapRWMutex.Lock()
 	defer common.OptionMapRWMutex.Unlock()
 	common.OptionMap[key] = value
@@ -225,14 +259,6 @@ func updateOptionMap(key string, value string) (err error) {
 			common.PasswordLoginEnabled = boolValue
 		case "EmailVerificationEnabled":
 			common.EmailVerificationEnabled = boolValue
-		case "GitHubOAuthEnabled":
-			common.GitHubOAuthEnabled = boolValue
-		case "LinuxDOOAuthEnabled":
-			common.LinuxDOOAuthEnabled = boolValue
-		case "WeChatAuthEnabled":
-			common.WeChatAuthEnabled = boolValue
-		case "TelegramOAuthEnabled":
-			common.TelegramOAuthEnabled = boolValue
 		case "TurnstileCheckEnabled":
 			common.TurnstileCheckEnabled = boolValue
 		case "RegisterEnabled":
@@ -259,24 +285,10 @@ func updateOptionMap(key string, value string) (err error) {
 			}
 		case "DisplayTokenStatEnabled":
 			common.DisplayTokenStatEnabled = boolValue
-		case "DrawingEnabled":
-			common.DrawingEnabled = boolValue
-		case "TaskEnabled":
-			common.TaskEnabled = boolValue
 		case "DataExportEnabled":
 			common.DataExportEnabled = boolValue
 		case "DefaultCollapseSidebar":
 			common.DefaultCollapseSidebar = boolValue
-		case "MjNotifyEnabled":
-			setting.MjNotifyEnabled = boolValue
-		case "MjAccountFilterEnabled":
-			setting.MjAccountFilterEnabled = boolValue
-		case "MjModeClearEnabled":
-			setting.MjModeClearEnabled = boolValue
-		case "MjForwardUrlEnabled":
-			setting.MjForwardUrlEnabled = boolValue
-		case "MjActionCheckSuccessEnabled":
-			setting.MjActionCheckSuccessEnabled = boolValue
 		case "CheckSensitiveEnabled":
 			setting.CheckSensitiveEnabled = boolValue
 		case "DemoSiteEnabled":
@@ -335,8 +347,6 @@ func updateOptionMap(key string, value string) (err error) {
 		operation_setting.Price, _ = strconv.ParseFloat(value, 64)
 	case "USDExchangeRate":
 		operation_setting.USDExchangeRate, _ = strconv.ParseFloat(value, 64)
-	case "MinTopUp":
-		operation_setting.MinTopUp, _ = strconv.Atoi(value)
 	case "StripeApiSecret":
 		setting.StripeApiSecret = value
 	case "StripeWebhookSecret":
@@ -345,8 +355,6 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.StripePriceId = value
 	case "StripeUnitPrice":
 		setting.StripeUnitPrice, _ = strconv.ParseFloat(value, 64)
-	case "StripeMinTopUp":
-		setting.StripeMinTopUp, _ = strconv.Atoi(value)
 	case "StripePromotionCodesEnabled":
 		setting.StripePromotionCodesEnabled = value == "true"
 	case "CreemApiKey":
@@ -357,34 +365,12 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.CreemTestMode = value == "true"
 	case "CreemWebhookSecret":
 		setting.CreemWebhookSecret = value
-	case "TopupGroupRatio":
-		err = common.UpdateTopupGroupRatioByJSONString(value)
-	case "GitHubClientId":
-		common.GitHubClientId = value
-	case "GitHubClientSecret":
-		common.GitHubClientSecret = value
-	case "LinuxDOClientId":
-		common.LinuxDOClientId = value
-	case "LinuxDOClientSecret":
-		common.LinuxDOClientSecret = value
-	case "LinuxDOMinimumTrustLevel":
-		common.LinuxDOMinimumTrustLevel, _ = strconv.Atoi(value)
 	case "Footer":
 		common.Footer = value
 	case "SystemName":
 		common.SystemName = value
 	case "Logo":
 		common.Logo = value
-	case "WeChatServerAddress":
-		common.WeChatServerAddress = value
-	case "WeChatServerToken":
-		common.WeChatServerToken = value
-	case "WeChatAccountQRCodeImageURL":
-		common.WeChatAccountQRCodeImageURL = value
-	case "TelegramBotToken":
-		common.TelegramBotToken = value
-	case "TelegramBotName":
-		common.TelegramBotName = value
 	case "TurnstileSiteKey":
 		common.TurnstileSiteKey = value
 	case "TurnstileSecretKey":
@@ -433,8 +419,6 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateAudioRatioByJSONString(value)
 	case "AudioCompletionRatio":
 		err = ratio_setting.UpdateAudioCompletionRatioByJSONString(value)
-	case "TopUpLink":
-		common.TopUpLink = value
 	//case "ChatLink":
 	//	common.ChatLink = value
 	//case "ChatLink2":
@@ -453,8 +437,6 @@ func updateOptionMap(key string, value string) (err error) {
 		err = operation_setting.AutomaticRetryStatusCodesFromString(value)
 	case "StreamCacheQueueLength":
 		setting.StreamCacheQueueLength, _ = strconv.Atoi(value)
-	case "PayMethods":
-		err = operation_setting.UpdatePayMethodsByJsonString(value)
 	}
 	return err
 }

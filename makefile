@@ -1,4 +1,4 @@
-FRONTEND_DIR = ./web
+FRONTEND_DIR = ./frontend
 BACKEND_DIR = .
 
 .PHONY: all build-frontend start-backend

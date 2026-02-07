@@ -15,7 +15,6 @@ var Version = "v0.0.0"            // this hard coding will be replaced automatic
 var SystemName = "New API"
 var Footer = ""
 var Logo = ""
-var TopUpLink = ""
 
 // var ChatLink = ""
 // var ChatLink2 = ""
@@ -23,8 +22,6 @@ var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
 // 保留旧变量以兼容历史逻辑，实际展示由 general_setting.quota_display_type 控制
 var DisplayInCurrencyEnabled = true
 var DisplayTokenStatEnabled = true
-var DrawingEnabled = true
-var TaskEnabled = true
 var DataExportEnabled = true
 var DataExportInterval = 5         // unit: minute
 var DataExportDefaultTime = "hour" // unit: minute
@@ -42,14 +39,14 @@ var ItemsPerPage = 10
 var MaxRecentItems = 100
 
 var PasswordLoginEnabled = true
-var PasswordRegisterEnabled = true
+var PasswordRegisterEnabled = false
 var EmailVerificationEnabled = false
 var GitHubOAuthEnabled = false
 var LinuxDOOAuthEnabled = false
 var WeChatAuthEnabled = false
 var TelegramOAuthEnabled = false
 var TurnstileCheckEnabled = false
-var RegisterEnabled = true
+var RegisterEnabled = false
 
 var EmailDomainRestrictionEnabled = false // 是否启用邮箱域名限制
 var EmailAliasRestrictionEnabled = false  // 是否启用邮箱别名限制
@@ -73,6 +70,7 @@ var DebugEnabled bool
 var MemoryCacheEnabled bool
 
 var LogConsumeEnabled = true
+var RecordIpLogEnabled = false
 
 var TLSInsecureSkipVerify bool
 var InsecureTLSConfig = &tls.Config{InsecureSkipVerify: true}
@@ -205,7 +203,4 @@ const (
 )
 
 const (
-	TopUpStatusPending = "pending"
-	TopUpStatusSuccess = "success"
-	TopUpStatusExpired = "expired"
 )

@@ -10,7 +10,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 )
 
@@ -21,10 +20,8 @@ type Pricing struct {
 	Tags                   string                  `json:"tags,omitempty"`
 	VendorID               int                     `json:"vendor_id,omitempty"`
 	QuotaType              int                     `json:"quota_type"`
-	ModelRatio             float64                 `json:"model_ratio"`
 	ModelPrice             float64                 `json:"model_price"`
 	OwnerBy                string                  `json:"owner_by"`
-	CompletionRatio        float64                 `json:"completion_ratio"`
 	EnableGroup            []string                `json:"enable_groups"`
 	SupportedEndpointTypes []constant.EndpointType `json:"supported_endpoint_types"`
 }
@@ -52,6 +49,11 @@ var (
 var (
 	modelSupportEndpointTypes = make(map[string][]constant.EndpointType)
 	modelSupportEndpointsLock = sync.RWMutex{}
+)
+
+var (
+	modelPricePer1MMap     map[string]float64
+	modelPricePer1MMapLock = sync.RWMutex{}
 )
 
 func GetPricing() []Pricing {
@@ -268,6 +270,7 @@ func updatePricing() {
 			ModelName:              model,
 			EnableGroup:            groups.Items(),
 			SupportedEndpointTypes: modelSupportEndpointTypes[model],
+			QuotaType:              1,
 		}
 
 		// 补充模型元数据（描述、标签、供应商、状态）
@@ -280,16 +283,7 @@ func updatePricing() {
 			pricing.Icon = meta.Icon
 			pricing.Tags = meta.Tags
 			pricing.VendorID = meta.VendorID
-		}
-		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
-		if findPrice {
-			pricing.ModelPrice = modelPrice
-			pricing.QuotaType = 1
-		} else {
-			modelRatio, _, _ := ratio_setting.GetModelRatio(model)
-			pricing.ModelRatio = modelRatio
-			pricing.CompletionRatio = ratio_setting.GetCompletionRatio(model)
-			pricing.QuotaType = 0
+			pricing.ModelPrice = meta.PricePer1M
 		}
 		pricingMap = append(pricingMap, pricing)
 	}
@@ -298,10 +292,14 @@ func updatePricing() {
 	modelEnableGroupsLock.Lock()
 	modelEnableGroups = make(map[string][]string)
 	modelQuotaTypeMap = make(map[string]int)
+	modelPricePer1MMapLock.Lock()
+	modelPricePer1MMap = make(map[string]float64)
 	for _, p := range pricingMap {
 		modelEnableGroups[p.ModelName] = p.EnableGroup
 		modelQuotaTypeMap[p.ModelName] = p.QuotaType
+		modelPricePer1MMap[p.ModelName] = p.ModelPrice
 	}
+	modelPricePer1MMapLock.Unlock()
 	modelEnableGroupsLock.Unlock()
 
 	lastGetPricingTime = time.Now()
@@ -310,4 +308,16 @@ func updatePricing() {
 // GetSupportedEndpointMap 返回全局端点到路径的映射
 func GetSupportedEndpointMap() map[string]common.EndpointInfo {
 	return supportedEndpointMap
+}
+
+func GetModelPricePer1M(modelName string) (float64, bool) {
+	if modelName == "" {
+		return 0, false
+	}
+	// ensure pricing cache initialized
+	GetPricing()
+	modelPricePer1MMapLock.RLock()
+	defer modelPricePer1MMapLock.RUnlock()
+	price, ok := modelPricePer1MMap[modelName]
+	return price, ok
 }

@@ -12,13 +12,11 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/oauth"
 	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service"
 	_ "github.com/QuantumNous/new-api/setting/performance_setting"
@@ -33,10 +31,10 @@ import (
 	_ "net/http/pprof"
 )
 
-//go:embed web/dist
+//go:embed frontend/dist
 var buildFS embed.FS
 
-//go:embed web/dist/index.html
+//go:embed frontend/dist/index.html
 var indexPage []byte
 
 func main() {
@@ -105,20 +103,7 @@ func main() {
 
 	go controller.AutomaticallyTestChannels()
 
-	// Codex credential auto-refresh check every 10 minutes, refresh when expires within 1 day
-	service.StartCodexCredentialAutoRefreshTask()
 
-	// Subscription quota reset task (daily/weekly/monthly/custom)
-	service.StartSubscriptionQuotaResetTask()
-
-	if common.IsMasterNode && constant.UpdateTask {
-		gopool.Go(func() {
-			controller.UpdateMidjourneyTaskBulk()
-		})
-		gopool.Go(func() {
-			controller.UpdateTaskBulk()
-		})
-	}
 	if os.Getenv("BATCH_UPDATE_ENABLED") == "true" {
 		common.BatchUpdateEnabled = true
 		common.SysLog("batch update enabled with interval " + strconv.Itoa(common.BatchUpdateInterval) + "s")
@@ -291,13 +276,6 @@ func InitResources() error {
 	}
 	// Register user language loader for lazy loading
 	i18n.SetUserLangLoader(model.GetUserLanguage)
-
-	// Load custom OAuth providers from database
-	err = oauth.LoadCustomProviders()
-	if err != nil {
-		common.SysError("failed to load custom OAuth providers: " + err.Error())
-		// Don't return error, custom OAuth is not critical
-	}
 
 	return nil
 }

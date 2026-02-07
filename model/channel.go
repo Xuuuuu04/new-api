@@ -74,8 +74,29 @@ func (c ChannelInfo) Value() (driver.Value, error) {
 
 // Scan implements sql.Scanner interface
 func (c *ChannelInfo) Scan(value interface{}) error {
-	bytesValue, _ := value.([]byte)
-	return common.Unmarshal(bytesValue, c)
+	if value == nil {
+		return nil
+	}
+	switch v := value.(type) {
+	case []byte:
+		if len(v) == 0 {
+			return nil
+		}
+		if err := common.Unmarshal(v, c); err != nil {
+			return nil
+		}
+		return nil
+	case string:
+		if v == "" {
+			return nil
+		}
+		if err := common.Unmarshal([]byte(v), c); err != nil {
+			return nil
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported ChannelInfo scan type: %T", value)
+	}
 }
 
 func (channel *Channel) GetKeys() []string {
@@ -675,6 +696,47 @@ func UpdateChannelStatus(channelId int, usingKey string, status int, reason stri
 			common.SysLog(fmt.Sprintf("failed to update channel status: channel_id=%d, status=%d, error=%v", channel.Id, status, err))
 			return false
 		}
+	}
+	return true
+}
+
+// UpdateChannelStatusManual toggles the whole channel status without relying on a specific key.
+// This is intended for admin/manual operations (e.g. mapping page toggle).
+func UpdateChannelStatusManual(channelId int, status int, reason string) bool {
+	channel, err := GetChannelById(channelId, true)
+	if err != nil {
+		return false
+	}
+
+	shouldResetMultiKey := channel.ChannelInfo.IsMultiKey && status == common.ChannelStatusEnabled
+	if channel.Status == status && (!shouldResetMultiKey || len(channel.ChannelInfo.MultiKeyStatusList) == 0) {
+		return false
+	}
+
+	info := channel.GetOtherInfo()
+	info["status_reason"] = reason
+	info["status_time"] = common.GetTimestamp()
+	channel.SetOtherInfo(info)
+	channel.Status = status
+
+	if shouldResetMultiKey {
+		channel.ChannelInfo.MultiKeyStatusList = nil
+		channel.ChannelInfo.MultiKeyDisabledReason = nil
+		channel.ChannelInfo.MultiKeyDisabledTime = nil
+		channel.ChannelInfo.MultiKeyPollingIndex = 0
+	}
+
+	if err := channel.SaveWithoutKey(); err != nil {
+		common.SysLog(fmt.Sprintf("failed to update channel status manual: channel_id=%d, status=%d, error=%v", channel.Id, status, err))
+		return false
+	}
+
+	if err := UpdateAbilityStatus(channelId, status == common.ChannelStatusEnabled); err != nil {
+		common.SysLog(fmt.Sprintf("failed to update ability status (manual): channel_id=%d, error=%v", channelId, err))
+	}
+
+	if common.MemoryCacheEnabled {
+		InitChannelCache()
 	}
 	return true
 }
