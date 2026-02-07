@@ -7,7 +7,7 @@ Community-maintained simplified edition based on the upstream new-api project.
 - English: [README_EN](./README_EN.md)
 
 ## Project Structure
-Backend: controller/service/router; Frontend: frontend/; Docs: docs/PROJECT_STRUCTURE.md
+Backend: src/controller/src/service/router; Frontend: src/frontend/; Docs: docs/PROJECT_STRUCTURE.md
 
 ## Quick Start
 cp .env.example .env && docker compose up -d --build
