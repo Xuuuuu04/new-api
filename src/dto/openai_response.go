@@ -365,8 +365,9 @@ type ResponsesOutputContent struct {
 }
 
 type ResponsesReasoningSummaryPart struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type        string `json:"type"`
+	Text        string `json:"text"`
+	Annotations []any  `json:"annotations"`
 }
 
 const (
@@ -385,11 +386,11 @@ const (
 
 // ResponsesStreamResponse 用于处理 /v1/responses 流式响应
 type ResponsesStreamResponse struct {
-	Type           string                         `json:"type"`
-	Response       *OpenAIResponsesResponse       `json:"response,omitempty"`
-	Delta          string                         `json:"delta,omitempty"`
-	Item           *ResponsesOutput               `json:"item,omitempty"`
-	SequenceNumber int                            `json:"sequence_number,omitempty"`
+	Type           string                   `json:"type"`
+	Response       *OpenAIResponsesResponse `json:"response,omitempty"`
+	Delta          string                   `json:"delta,omitempty"`
+	Item           *ResponsesOutput         `json:"item,omitempty"`
+	SequenceNumber int                      `json:"sequence_number,omitempty"`
 	// - response.function_call_arguments.delta
 	// - response.function_call_arguments.done
 	OutputIndex  *int                           `json:"output_index,omitempty"`

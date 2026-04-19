@@ -25,10 +25,14 @@ type StreamState struct {
 	ToolCallCounter int    // independent tool-call counter (replaces fcIdx for Responses)
 	ActiveBlockType string // "text" | "tool_use" | "thinking"
 	TextContentIdx  int    // content_index for text content block
+	CurToolCallId   string // call_id for current tool_use block
+	CurToolName     string // name for current tool_use block
 	// accumulated text / arguments for done events
 	AccText      strings.Builder
 	AccArguments strings.Builder
 	AccThinking  strings.Builder
+	// completed output items snapshot for response.completed
+	CompletedOutputItems []dto.ResponsesOutput
 }
 
 // nextSeq returns the current sequence number and increments it.
@@ -766,8 +770,9 @@ func StreamClaude2Responses(c *gin.Context, claudeInfo *ClaudeResponseInfo, ev *
 				OutputIndex:    intPtr(ss.CurOutputIdx),
 				ContentIndex:   intPtr(ss.TextContentIdx),
 				Part: &dto.ResponsesReasoningSummaryPart{
-					Type: "output_text",
-					Text: "",
+					Type:        "output_text",
+					Text:        "",
+					Annotations: []any{},
 				},
 			}
 			if err := helper.ObjectData(c, contentAdded); err != nil {
@@ -779,6 +784,8 @@ func StreamClaude2Responses(c *gin.Context, claudeInfo *ClaudeResponseInfo, ev *
 			ss.ActiveBlockType = "tool_use"
 			ss.AccArguments.Reset()
 			ss.ToolCallCounter++
+			ss.CurToolCallId = ev.ContentBlock.Id
+			ss.CurToolName = ev.ContentBlock.Name
 
 			// response.output_item.added (type=function_call)
 			itemAdded := &dto.ResponsesStreamResponse{
@@ -827,8 +834,9 @@ func StreamClaude2Responses(c *gin.Context, claudeInfo *ClaudeResponseInfo, ev *
 				OutputIndex:    intPtr(ss.CurOutputIdx),
 				SummaryIndex:   intPtr(0),
 				Part: &dto.ResponsesReasoningSummaryPart{
-					Type: "reasoning_summary",
-					Text: "",
+					Type:        "reasoning_summary",
+					Text:        "",
+					Annotations: []any{},
 				},
 			}
 			if err := helper.ObjectData(c, summaryAdded); err != nil {
@@ -926,31 +934,34 @@ func StreamClaude2Responses(c *gin.Context, claudeInfo *ClaudeResponseInfo, ev *
 				OutputIndex:    intPtr(ss.CurOutputIdx),
 				ContentIndex:   intPtr(ss.TextContentIdx),
 				Part: &dto.ResponsesReasoningSummaryPart{
-					Type: "output_text",
-					Text: fullText,
+					Type:        "output_text",
+					Text:        fullText,
+					Annotations: []any{},
 				},
 			}
 			if err := helper.ObjectData(c, partDone); err != nil {
 				return types.NewError(err, types.ErrorCodeBadResponseBody)
+			}
+			completedTextItem := dto.ResponsesOutput{
+				ID:     ss.CurItemID,
+				Type:   "message",
+				Status: "completed",
+				Role:   "assistant",
+				Content: []dto.ResponsesOutputContent{
+					{Type: "output_text", Text: fullText, Annotations: []interface{}{}},
+				},
 			}
 			// response.output_item.done (message)
 			itemDone := &dto.ResponsesStreamResponse{
 				Type:           dto.ResponsesOutputTypeItemDone,
 				SequenceNumber: ss.nextSeq(),
 				OutputIndex:    intPtr(ss.CurOutputIdx),
-				Item: &dto.ResponsesOutput{
-					ID:     ss.CurItemID,
-					Type:   "message",
-					Status: "completed",
-					Role:   "assistant",
-					Content: []dto.ResponsesOutputContent{
-						{Type: "output_text", Text: fullText, Annotations: []interface{}{}},
-					},
-				},
+				Item:           &completedTextItem,
 			}
 			if err := helper.ObjectData(c, itemDone); err != nil {
 				return types.NewError(err, types.ErrorCodeBadResponseBody)
 			}
+			ss.CompletedOutputItems = append(ss.CompletedOutputItems, completedTextItem)
 			ss.CurOutputIdx++
 
 		case "tool_use":
@@ -966,21 +977,25 @@ func StreamClaude2Responses(c *gin.Context, claudeInfo *ClaudeResponseInfo, ev *
 			if err := helper.ObjectData(c, argsDone); err != nil {
 				return types.NewError(err, types.ErrorCodeBadResponseBody)
 			}
+			completedToolItem := dto.ResponsesOutput{
+				ID:        ss.CurItemID,
+				Type:      "function_call",
+				Status:    "completed",
+				CallId:    ss.CurToolCallId,
+				Name:      ss.CurToolName,
+				Arguments: fullArgs,
+			}
 			// response.output_item.done (function_call)
 			itemDone := &dto.ResponsesStreamResponse{
 				Type:           dto.ResponsesOutputTypeItemDone,
 				SequenceNumber: ss.nextSeq(),
 				OutputIndex:    intPtr(ss.CurOutputIdx),
-				Item: &dto.ResponsesOutput{
-					ID:        ss.CurItemID,
-					Type:      "function_call",
-					Status:    "completed",
-					Arguments: fullArgs,
-				},
+				Item:           &completedToolItem,
 			}
 			if err := helper.ObjectData(c, itemDone); err != nil {
 				return types.NewError(err, types.ErrorCodeBadResponseBody)
 			}
+			ss.CompletedOutputItems = append(ss.CompletedOutputItems, completedToolItem)
 			ss.CurOutputIdx++
 
 		case "thinking":
@@ -1009,30 +1024,33 @@ func StreamClaude2Responses(c *gin.Context, claudeInfo *ClaudeResponseInfo, ev *
 				OutputIndex:    intPtr(ss.CurOutputIdx),
 				SummaryIndex:   intPtr(0),
 				Part: &dto.ResponsesReasoningSummaryPart{
-					Type: "reasoning_summary",
-					Text: fullThinking,
+					Type:        "reasoning_summary",
+					Text:        fullThinking,
+					Annotations: []any{},
 				},
 			}
 			if err := helper.ObjectData(c, partDone); err != nil {
 				return types.NewError(err, types.ErrorCodeBadResponseBody)
+			}
+			completedReasoningItem := dto.ResponsesOutput{
+				ID:     ss.CurItemID,
+				Type:   "reasoning",
+				Status: "completed",
+				Content: []dto.ResponsesOutputContent{
+					{Type: "reasoning_summary", Text: fullThinking, Annotations: []interface{}{}},
+				},
 			}
 			// response.output_item.done (reasoning)
 			itemDone := &dto.ResponsesStreamResponse{
 				Type:           dto.ResponsesOutputTypeItemDone,
 				SequenceNumber: ss.nextSeq(),
 				OutputIndex:    intPtr(ss.CurOutputIdx),
-				Item: &dto.ResponsesOutput{
-					ID:     ss.CurItemID,
-					Type:   "reasoning",
-					Status: "completed",
-					Content: []dto.ResponsesOutputContent{
-						{Type: "reasoning_summary", Text: fullThinking},
-					},
-				},
+				Item:           &completedReasoningItem,
 			}
 			if err := helper.ObjectData(c, itemDone); err != nil {
 				return types.NewError(err, types.ErrorCodeBadResponseBody)
 			}
+			ss.CompletedOutputItems = append(ss.CompletedOutputItems, completedReasoningItem)
 			ss.CurOutputIdx++
 		}
 		ss.ActiveBlockType = ""
@@ -1093,6 +1111,11 @@ func buildResponsesCompletedEvent(info *ClaudeResponseInfo) *dto.ResponsesStream
 
 	seqNo := ss.nextSeq()
 
+	output := ss.CompletedOutputItems
+	if output == nil {
+		output = []dto.ResponsesOutput{}
+	}
+
 	return &dto.ResponsesStreamResponse{
 		Type:           "response.completed",
 		SequenceNumber: seqNo,
@@ -1102,7 +1125,7 @@ func buildResponsesCompletedEvent(info *ClaudeResponseInfo) *dto.ResponsesStream
 			CreatedAt: int(info.Created),
 			Model:     info.Model,
 			Status:    "completed",
-			Output:    []dto.ResponsesOutput{},
+			Output:    output,
 			Usage:     usage,
 		},
 	}
