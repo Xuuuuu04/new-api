@@ -531,6 +531,7 @@ type ClaudeUsage struct {
 	CacheCreationInputTokens int                       `json:"cache_creation_input_tokens"`
 	CacheReadInputTokens     int                       `json:"cache_read_input_tokens"`
 	OutputTokens             int                       `json:"output_tokens"`
+	ThinkingOutputTokens     int                       `json:"thinking_output_tokens,omitempty"`
 	CacheCreation            *ClaudeCacheCreationUsage `json:"cache_creation,omitempty"`
 	// claude cache 1h
 	ClaudeCacheCreation5mTokens int                  `json:"claude_cache_creation_5_m_tokens"`

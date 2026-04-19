@@ -16,6 +16,8 @@ func ClaudeStopReasonToOpenAIFinishReason(stopReason string) string {
 		return "length"
 	case "tool_use":
 		return "tool_calls"
+	case "pause_turn":
+		return "incomplete"
 	case "refusal":
 		return constant.FinishReasonContentFilter
 	default:

@@ -2,6 +2,7 @@ package relay
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -58,6 +59,17 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	request, err := common.DeepCopy(responsesReq)
 	if err != nil {
 		return types.NewError(fmt.Errorf("failed to copy request to GeneralOpenAIRequest: %w", err), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+
+	// Finding 15: stateful Responses (previous_response_id) are not supported.
+	// Intercept here at the outermost layer to guarantee HTTP 400 with skip-retry.
+	if request.PreviousResponseID != "" {
+		return types.NewErrorWithStatusCode(
+			errors.New("stateful responses are not supported: previous_response_id must be empty"),
+			types.ErrorCodeInvalidRequest,
+			http.StatusBadRequest,
+			types.ErrOptionWithSkipRetry(),
+		)
 	}
 
 	err = helper.ModelMappedHelper(c, info, request)

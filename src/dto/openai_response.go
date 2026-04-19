@@ -263,6 +263,18 @@ type OutputTokenDetails struct {
 	ReasoningTokens int `json:"reasoning_tokens"`
 }
 
+type ResponsesOutputTokensDetails struct {
+	ReasoningTokens int `json:"reasoning_tokens"`
+}
+
+type ResponsesUsage struct {
+	InputTokens         int                           `json:"input_tokens"`
+	OutputTokens        int                           `json:"output_tokens"`
+	TotalTokens         int                           `json:"total_tokens"`
+	InputTokensDetails  *InputTokenDetails            `json:"input_tokens_details,omitempty"`
+	OutputTokensDetails *ResponsesOutputTokensDetails `json:"output_tokens_details,omitempty"`
+}
+
 type OpenAIResponsesResponse struct {
 	ID                 string             `json:"id"`
 	Object             string             `json:"object"`
@@ -283,7 +295,7 @@ type OpenAIResponsesResponse struct {
 	Tools              []map[string]any   `json:"tools"`
 	TopP               float64            `json:"top_p"`
 	Truncation         string             `json:"truncation"`
-	Usage              *Usage             `json:"usage"`
+	Usage              *ResponsesUsage    `json:"usage"`
 	User               json.RawMessage    `json:"user"`
 	Metadata           json.RawMessage    `json:"metadata"`
 }
@@ -373,10 +385,11 @@ const (
 
 // ResponsesStreamResponse 用于处理 /v1/responses 流式响应
 type ResponsesStreamResponse struct {
-	Type     string                   `json:"type"`
-	Response *OpenAIResponsesResponse `json:"response,omitempty"`
-	Delta    string                   `json:"delta,omitempty"`
-	Item     *ResponsesOutput         `json:"item,omitempty"`
+	Type           string                         `json:"type"`
+	Response       *OpenAIResponsesResponse       `json:"response,omitempty"`
+	Delta          string                         `json:"delta,omitempty"`
+	Item           *ResponsesOutput               `json:"item,omitempty"`
+	SequenceNumber int                            `json:"sequence_number,omitempty"`
 	// - response.function_call_arguments.delta
 	// - response.function_call_arguments.done
 	OutputIndex  *int                           `json:"output_index,omitempty"`
